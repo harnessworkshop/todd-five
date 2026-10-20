@@ -1,6 +1,7 @@
 pipeline:
   id: pipeline_harnessworkshop_todd_five_build_afd3
   name: pipeline_harnessworkshop_todd_five_build_afd3
+  description: Builds the todd-five project and deploys it to Kubernetes with a rolling strategy.
   stages:
     - name: Build
       id: build
@@ -28,5 +29,89 @@ pipeline:
               type: junit
               paths:
                 - target/surefire-reports/*.xml
+    - name: Deploy
+      id: deploy
+      runtime: cloud
+      service:
+        items:
+          - todd_five_k8s_service
+      environment:
+        items:
+          - id: todd_five_env
+            deploy-to: todd_five_infra
+      steps:
+        - group:
+            id: k8s_rolling_deploy
+            name: Kubernetes Rolling Deploy
+            steps:
+              - name: Kubernetes Rolling Prepare Action
+                id: k8sRollingPrepareAction
+                template:
+                  uses: k8sRollingPrepareAction
+                  with:
+                    kubeconfig: ${{infra.kube_config_path}}
+                    namespace: ${{infra.namespace}}
+                    manifests: ${{runtime.manifestPath}}
+                    release: ${{infra.releaseName}}
+                    skip_resource_versioning: false
+                    pruning: false
+                    log_level: info
+              - name: Kubernetes Apply Action
+                id: k8sApplyAction
+                template:
+                  uses: k8sApplyAction
+                  with:
+                    kubeconfig: ${{infra.kube_config_path}}
+                    namespace: ${{infra.namespace}}
+                    manifests: ${{steps.k8sRollingPrepareAction.output.outputVariables.MANIFEST_OUTPUT_PATH}}
+                    skip_dry_run: false
+                    pruning: false
+                    server_side_apply: false
+                    release: ${{infra.releaseName}}
+                    release_number: ${{steps.k8sRollingPrepareAction.output.outputVariables.RELEASE_NUMBER}}
+                    print_manifests: false
+                    encrypt_yaml_output: true
+                    only_dry_run: false
+                    log_level: info
+                    timeout: 5m
+              - name: Kubernetes Steady State Check Action
+                id: k8sSteadyStateCheckAction
+                template:
+                  uses: k8sSteadyStateCheckAction
+                  with:
+                    kubeconfig: ${{infra.kube_config_path}}
+                    release: ${{infra.releaseName}}
+                    release_number: ${{steps.k8sApplyAction.output.outputVariables.RELEASE_NUMBER}}
+                    namespace: ${{infra.namespace}}
+                    describe_resources: false
+                    managed_workloads: ${{steps.k8sApplyAction.output.outputVariables.MANAGED_WORKLOADS}}
+                    custom_workloads: ${{steps.k8sApplyAction.output.outputVariables.CUSTOM_WORKLOADS}}
+                    existing_pods: ${{steps.k8sApplyAction.output.outputVariables.EXISTING_PODS}}
+                    manifest: ${{steps.k8sApplyAction.output.outputVariables.MANIFEST_OUTPUT_FILE_PATH}}
+                    log_level: info
+                    timeout: 5m
+                    is_openshift: ${{steps.k8sApplyAction.output.outputVariables.HARNESS_IS_OPENSHIFT}}
+      rollback:
+        - group:
+            id: k8sRollingRollback
+            name: Kubernetes Rolling Rollback
+            steps:
+              - name: Kubernetes Rolling Rollback Action
+                id: k8sRollingRollbackAction
+                template:
+                  uses: k8sRollingRollbackAction
+                  with:
+                    kubeconfig: ${{infra.kube_config_path}}
+                    namespace: ${{infra.namespace}}
+                    release: ${{infra.releaseName}}
+                    release_number: ${{rollback.data.PLUGIN_RELEASE_NUMBER}}
+                    force_rollback: false
+                    pruning: false
+                    log_level: info
+                    timeout: 5m
+      on-failure:
+        errors: all
+        action: stage-rollback
   tags:
     onboarding: "true"
+    ai_generated: ""
