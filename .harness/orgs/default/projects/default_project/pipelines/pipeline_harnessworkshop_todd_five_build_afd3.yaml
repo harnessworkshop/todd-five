@@ -1,7 +1,7 @@
 pipeline:
   id: pipeline_harnessworkshop_todd_five_build_afd3
   name: pipeline_harnessworkshop_todd_five_build_afd3
-  description: Builds the todd-five project and deploys it to Kubernetes with a rolling strategy.
+  description: Builds the todd-five project, pushes its Docker image, and deploys it to Kubernetes with a rolling strategy.
   stages:
     - name: Build
       id: build
@@ -29,6 +29,15 @@ pipeline:
               type: junit
               paths:
                 - target/surefire-reports/*.xml
+        - name: Build and Push Docker Image
+          id: build_and_push_image
+          build:
+            uses: buildAndPushToDocker
+            with:
+              connector: connector_DockerRegistry_d60e
+              repo: parsontodd/todd-five
+              tags:
+                - latest
     - name: Deploy
       id: deploy
       runtime:
