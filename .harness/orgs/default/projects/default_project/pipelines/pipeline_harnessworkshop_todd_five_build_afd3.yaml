@@ -31,7 +31,10 @@ pipeline:
                 - target/surefire-reports/*.xml
     - name: Deploy
       id: deploy
-      runtime: cloud
+      runtime:
+        kubernetes:
+          connector: connector_K8sCluster_64e9
+          namespace: harness-delegate-unified
       service:
         items:
           - todd_five_k8s_service
