@@ -1,0 +1,32 @@
+pipeline:
+  id: pipeline_harnessworkshop_todd_five_build_afd3
+  name: pipeline_harnessworkshop_todd_five_build_afd3
+  stages:
+    - name: Build
+      id: build
+      runtime: cloud
+      platform:
+        os: linux
+        arch: amd64
+      clone:
+        enabled: true
+      cache:
+        enabled: true
+      build-intelligence:
+        enabled: true
+      steps:
+        - name: Build and Test
+          id: build_and_test
+          run:
+            shell: bash
+            container:
+              image: maven:3-eclipse-temurin-17
+            script: |-
+              java -version
+              mvn -B clean install
+            report:
+              type: junit
+              paths:
+                - target/surefire-reports/*.xml
+  tags:
+    onboarding: "true"
